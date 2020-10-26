@@ -14,9 +14,6 @@ yarn run build
 # barrage
 ### 一个基于canvas的弹幕组件
 
-### 弹幕效果
-
-![barrage](https://user-gold-cdn.xitu.io/2019/7/20/16c0f1a946a59f3e?w=480&h=188&f=gif&s=4517801)
 
 ### 功能点
 
@@ -30,7 +27,7 @@ yarn run build
 
 ### 使用
 
-`npm install vue-barrage`
+`npm install barrage-vue`
 
 ### 参数配置
 
@@ -58,7 +55,7 @@ yarn run build
     :background="background"
     :linear-gradient="linearGradient"/>
 
-import Barrage from 'vue-barrage'
+import Barrage from 'barrage-vue'
 
 // 弹幕数据初始化
 this.barrageList = [{
@@ -76,6 +73,5 @@ this.$refs.barrage.add({
 })
 ```
 
-[文章分析](https://juejin.im/post/5d32ef685188251b4b32b348)
 
 
