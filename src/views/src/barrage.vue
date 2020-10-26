@@ -1,30 +1,23 @@
-<!--
- * @Author: your name
- * @Date: 2020-03-18 13:26:53
- * @LastEditTime: 2020-09-02 22:00:19
- * @LastEditors: Please set LastEditors
- * @Description: In User Settings Edit
- * @FilePath: /vue-barrage/src/views/src/barrage_new.vue
--->
+
 <template>
   <div class="z_barrage-container">
     <canvas
-      ref="canvasContainer"
-      :width="containerWidth"
-      :height="containerHeight"
-      style="display: none;"
+            :ref="utilCanvasId"
+            :width="containerWidth"
+            :height="containerHeight"
+            style="display: none;"
     />
     <div
-      class="z_container"
-      :style="{height: containerHeight/2+'px'}"
+            class="z_container"
+            :style="{height: containerHeight/2+'px'}"
     >
       <canvas
-        id="canvas"
-        ref="canvas"
-        class="z_barrage"
-        :width="containerWidth"
-        :height="containerHeight"
-        :style="{'width': containerWidth/2 + 'px',
+              :id="canvasId"
+              :ref="canvasId"
+              class="z_barrage"
+              :width="containerWidth"
+              :height="containerHeight"
+              :style="{'width': containerWidth/2 + 'px',
                  'height': containerHeight/2 + 'px'}"
       />
     </div>
@@ -32,7 +25,6 @@
 </template>
 
 <script>
-// import faceMap from '../../assets/emoji'
 export default {
   name: 'Barrage',
   props: {
@@ -56,10 +48,6 @@ export default {
       type: Number,
       default: 60
     },
-    screenPercent: {
-      type: Number,
-      default: 0.3
-    },
     borderColor: {
       type: String,
       default: ''
@@ -76,6 +64,55 @@ export default {
           endColor: ''
         }
       }
+    },
+    fontSize: { // 文字大小
+      type: Number,
+      default: 30
+    },
+    avatarBorderColor: {
+      type: String,
+      default: ''
+    },
+    avatarBorderWidth: {
+      type: Number,
+      default: 0
+    },
+    avatarWidth: {
+      type: Number,
+      default: 48
+    },
+    horizontalGap: {
+      type: Number,
+      default: 100
+    },
+    verticalGap: {
+      type: Number,
+      default: 20
+    },
+    width: {
+      type: Number,
+      default: document.body.clientWidth * 2
+    },
+    // 文字render
+    textRender: {
+      type: Function,
+      default(context, data, x, y, component) {
+        component.drawText(context, data.content, x, y)
+      },
+    },
+    // 头像render
+    avatarRender: {
+      type: Function,
+      default(context, data, x, y, r, component) {
+        component.drawAvatar(context, data.icon, x, y, r)
+      }
+    },
+    // 背景render
+    backgroundRender: {
+      type: Function,
+      default(context, data, x, y, width, height, radius, component) {
+        component.drawBackground(context, data.bgColor, x, y, width, height, radius)
+      }
     }
   },
   data () {
@@ -86,31 +123,42 @@ export default {
       containerWidth: 0,
       containerHeight: 0,
       channelsArray: [],
-      barrageChannels: 1
+      barrageChannels: 1,
+      playing: false,
+      canvasId: `barrage_cvs_${new Date().getTime()}`,
+      utilCanvasId: `barrage_util_cvs_${new Date().getTime()}` // 用于进行文字测量计算的临时canvas
     }
   },
   watch: {
-    barrageList (val) {
-      if (val.length !== 0) {
-        this.barrageQueue = JSON.parse(JSON.stringify(val))
-        this.newBarrageArray = JSON.parse(JSON.stringify(val))
-        this.initData()
-        window.requestAnimationFrame(this.render)
-      }
+    barrageList: {
+      handler(val) {
+        this.$nextTick(() => {
+          if (val.length !== 0) {
+            this.barrageQueue = JSON.parse(JSON.stringify(val))
+            this.newBarrageArray = JSON.parse(JSON.stringify(val))
+            this.initData()
+            if (!this.playing) {
+              window.requestAnimationFrame(this.render)
+              this.playing = true
+            }
+          }
+        })
+      },
+      immediate: true
     }
   },
   mounted () {
-    this.containerWidth = document.body.clientWidth * 2
-    this.containerHeight = window.screen.height * this.screenPercent > 2 * this.barrageHeight ? window.screen.height * this.screenPercent : (this.barrageHeight + 30) // 设定总高度
-    this.barrageChannels = Math.floor(this.containerHeight / (this.barrageHeight + 30)) || this.channels // 总高度对应的轨道数
-    this.ctx = this.$refs.canvas.getContext('2d')
-    this.ctx1 = this.$refs.canvasContainer.getContext('2d')
+    this.containerWidth = this.width
+    this.barrageChannels = this.channels // 总高度对应的轨道数
+    this.containerHeight =  this.channels * (this.barrageHeight + this.verticalGap) + this.verticalGap // 设定总高度
+    this.ctx = this.$refs[this.canvasId].getContext('2d')
+    this.ctx1 = this.$refs[this.utilCanvasId].getContext('2d')
     this.barrageClickEvent()
   },
   methods: {
     /**
-       * 数据初始化
-       */
+     * 数据初始化
+     */
     initData () {
       for (let i = 0; i < this.barrageQueue.length; i++) { // 此处处理只显示50个字符
         let tagImg = null
@@ -125,9 +173,9 @@ export default {
         }
         let content = this.dealStr(this.barrageQueue[i].content)
         this.barrageArray.push({
-          id: this.barrageQueue[i].id,
+          ...this.barrageQueue[i],
           content: content,
-          x: this.containerWidth + this.barrageHeight,
+          x: this.containerWidth + (+this.horizontalGap),
           icon: img,
           tagImage: tagImg,
           width: this.ctx1.measureText(content).width * 3 + (this.barrageQueue[i].icon ? 60 : 0),
@@ -138,8 +186,8 @@ export default {
       this.initChannel()
     },
     /**
-       * 初始化轨道数据
-       */
+     * 初始化轨道数据
+     */
     initChannel () {
       for (let i = 0; i < this.barrageChannels; i++) {
         let item = this.barrageArray.shift()
@@ -155,7 +203,7 @@ export default {
      */
     render () {
       this.ctx.clearRect(0, 0, this.containerWidth, this.containerHeight)
-      this.ctx.font = '30px Microsoft YaHei'
+      this.ctx.font = `${this.fontSize}px Microsoft YaHei`
       this.draw()
       window.requestAnimationFrame(this.render)
     },
@@ -166,15 +214,18 @@ export default {
             let barrage = this.channelsArray[i][j]
             barrage.x -= this.speed
             if (barrage.x <= this.containerWidth) { // 弹幕显示
-              this.borderColor && this.drawRoundRectBorder(this.ctx, barrage.x - this.barrageHeight / 2, i * (this.barrageHeight + 20) + 20, barrage.width + this.barrageHeight, this.barrageHeight, this.barrageHeight / 2)
-              this.drawRoundRect(this.ctx, barrage.bgColor, barrage.x - this.barrageHeight / 2, i * (this.barrageHeight + 20) + 21, barrage.width + this.barrageHeight, this.barrageHeight - 2, this.barrageHeight / 2)
+              const gap = this.verticalGap; // 每个轨道之间的缝隙
+              const currTop = i * (this.barrageHeight + gap) + gap // 当前弹幕条的顶部
+              const currMiddle = currTop + this.barrageHeight / 2 // 当前弹幕条的中间y位置
+              this.borderColor && this.drawRoundRectBorder(this.ctx, barrage.x - this.barrageHeight / 2, currTop, barrage.width + this.barrageHeight, this.barrageHeight, this.barrageHeight / 2)
+              this.backgroundRender(this.ctx, barrage, barrage.x - this.barrageHeight / 2, currTop + 1, barrage.width + this.barrageHeight, this.barrageHeight - 2, this.barrageHeight / 2, this)
               this.ctx.fillStyle = `${barrage.color}`
-              this.ctx.fillText(barrage.content, barrage.x + (barrage.icon ? this.barrageHeight / 2 + 20 : -5), i * (this.barrageHeight + 20) + this.barrageHeight)
+              this.textRender(this.ctx, barrage, barrage.x + (barrage.icon ? this.barrageHeight / 2 + this.fontSize : -5), currMiddle + this.fontSize / 2 - this.fontSize * 0.1, this) // 行高高于字体大小
               if (barrage.icon) {
-                this.circleImg(this.ctx, barrage.icon, barrage.x - 10, i * (this.barrageHeight + 20) + 26, 24)
+                this.avatarRender(this.ctx, barrage, barrage.x - 10, currMiddle - this.avatarWidth / 2, this.avatarWidth / 2, this)
               }
               if (barrage.tagImage) {
-                this.originImg(this.ctx, barrage.tagImage, barrage.x - this.barrageHeight - 10, i * (this.barrageHeight + 20) + 20, this.barrageHeight, this.barrageHeight)
+                this.originImg(this.ctx, barrage.tagImage, barrage.x - this.barrageHeight - 10, currTop, this.barrageHeight, this.barrageHeight)
               }
             }
             if (barrage.x < -(barrage.width + this.barrageHeight)) { // 弹幕删除
@@ -199,7 +250,7 @@ export default {
       }
     },
     /**
-     * 重置数据
+     * 添加数据
      */
     add (obj) {
       let content = this.dealStr(obj.content)
@@ -214,7 +265,7 @@ export default {
         tagImg.src = obj.tagImage
       }
       let item = {
-        id: obj.id,
+        ...obj,
         content: content,
         x: this.containerWidth + this.barrageHeight,
         icon: obj.icon ? img : '',
@@ -224,10 +275,7 @@ export default {
         bgColor: obj.bgColor || 'rgba(0,0,0,0.4)'
       }
       let originItem = {
-        id: obj.id,
-        content: obj.content,
-        icon: obj.icon,
-        tagImage: obj.tagImage,
+        ...obj,
         color: obj.color || '#FFFFFF',
         bgColor: obj.bgColor || 'rgba(0,0,0,0.4)'
       }
@@ -243,16 +291,26 @@ export default {
      * 弹幕点击事件
      */
     barrageClickEvent () {
-      document.getElementById('canvas').addEventListener('click', (e) => {
+      document.getElementById(this.canvasId).addEventListener('click', (e) => {
         const p = this.getEventPosition(e)
         let channelIndex = Math.floor(p.y / (this.barrageHeight + 30))
-        const tempArray = JSON.parse(JSON.stringify(this.channelsArray[channelIndex]))
-        for (let i = 0; i < tempArray.length; i++) {
-          let channelItemArray = tempArray[i]
+        if(channelIndex > this.channels - 1) {
+          return;
+        }
+        const channelsArray = this.channelsArray[channelIndex]
+        for (let i = 0; i < channelsArray.length; i++) {
+          let channelItemArray = Object.assign({}, channelsArray[i])
           if (p.x > channelItemArray.x && p.x < (channelItemArray.x + channelItemArray.width)) {
-            if (channelItemArray.id) {
-              this.$emit('doLike', channelItemArray.id)
+            // 该条弹幕点击
+            this.$emit('click-item', channelItemArray)
+            if (channelItemArray.icon && p.x < channelItemArray.x + this.barrageHeight / 2 + 20) {
+              // 弹幕头像点击
+              this.$emit('click-icon', channelItemArray)
+            } else {
+              // 弹幕内容区点击
+              this.$emit('click-content', channelItemArray)
             }
+            break;
           }
         }
       }, false)
@@ -282,26 +340,29 @@ export default {
       return true
     },
     /**
-       * 处理字符
-       */
+     * 处理字符
+     */
     dealStr (str) {
       return str.length > 50 ? `${str.substring(0, 50)}...` : str
     },
     /**
-       * 获取随机颜色
-       */
+     * 获取随机颜色
+     */
     getColor () {
       return `#${Math.floor(Math.random() * 16777215).toString(16)}`
     },
+    drawText(context, text, x, y) {
+      context.fillText(text, x, y)
+    },
     /**
-       * 裁剪图片
-       * @param ctx
-       * @param img
-       * @param x
-       * @param y
-       * @param r
-       */
-    circleImg (ctx, img, x, y, r) {
+     * 裁剪图片
+     * @param ctx
+     * @param img
+     * @param x
+     * @param y
+     * @param r
+     */
+    drawAvatar (ctx, img, x, y, r) {
       ctx.save()
       let d = 2 * r
       let cx = x + r
@@ -309,7 +370,16 @@ export default {
       ctx.beginPath()
       ctx.arc(cx, cy, r, 0, 2 * Math.PI)
       ctx.clip()
-      ctx.drawImage(img, x, y, d, d)
+      try {
+        ctx.drawImage(img, x, y, d, d)
+      } catch (e) {
+        console.warn(`[barrage],drawAvatar,头像绘制失败, icon: ${img.src}`)
+      }
+      if (this.avatarBorderColor || this.avatarBorderWidth) {
+        ctx.strokeStyle = this.avatarBorderColor
+        ctx.lineWidth = this.avatarBorderWidth
+        ctx.stroke()
+      }
       ctx.restore()
       ctx.closePath()
     },
@@ -332,16 +402,16 @@ export default {
       }
     },
     /**
-       * 绘画圆角矩形
-       * @param context
-       * @param bgColor
-       * @param x
-       * @param y
-       * @param width
-       * @param height
-       * @param radius
-       */
-    drawRoundRect (context, bgColor, x, y, width, height, radius) {
+     * 绘画圆角矩形
+     * @param context
+     * @param bgColor
+     * @param x
+     * @param y
+     * @param width
+     * @param height
+     * @param radius
+     */
+    drawBackground (context, bgColor, x, y, width, height, radius) {
       if (this.linearGradient.startColor && this.linearGradient.endColor) {
         let linearGrad = context.createLinearGradient(x, y, x, y + height)
         linearGrad.addColorStop(0, this.linearGradient.startColor)
@@ -362,14 +432,14 @@ export default {
       context.closePath()
     },
     /**
-       * 绘画圆角矩形
-       * @param context
-       * @param x
-       * @param y
-       * @param width
-       * @param height
-       * @param radius 半径
-       */
+     * 绘画圆角矩形
+     * @param context
+     * @param x
+     * @param y
+     * @param width
+     * @param height
+     * @param radius 半径
+     */
     drawRoundRectBorder (context, x, y, width, height, radius) {
       context.beginPath()
       context.lineWidth = 2
@@ -388,17 +458,10 @@ export default {
 }
 </script>
 
-<style lang="scss" scoped>
-  .z_barrage-container {
-    /*pointer-events: none;*/
-  }
-  .z_container {
-    width: 100%;
-    overflow: hidden;
-  }
-  .z_barrage {
-    position: absolute;
-    top: 0;
-    left: 0;
-  }
+<style lang="css" scoped>
+.z_container {
+  width: 100%;
+  overflow: hidden;
+}
+
 </style>
