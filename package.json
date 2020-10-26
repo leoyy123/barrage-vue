@@ -1,7 +1,6 @@
 {
   "name": "barrage",
-  "version": "0.1.0",
-  "private": true,
+  "version": "0.1.1",
   "scripts": {
     "serve": "vue-cli-service serve",
     "build": "vue-cli-service build",
@@ -14,7 +13,6 @@
     "sass-loader": "^7.1.0",
     "vconsole": "^3.3.4",
     "vue": "^2.6.10",
-    "vue-barrage": "0.0.4",
     "vue-router": "^3.0.3",
     "vuex": "^3.0.1"
   },
